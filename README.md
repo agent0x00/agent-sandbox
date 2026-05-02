@@ -58,9 +58,12 @@ make hooks-install
 ### GitHub PAT
 
 1. GitHub → Settings → Developer settings → Fine-grained tokens → Generate new token
-2. Repository access: "Only select repositories"
-3. Permissions: Contents → Read & Write
-4. Add to `~/.profile`:
+2. Resource owner: your account
+3. Repository access: "Only select repositories"
+4. Permissions (only one needed):
+   - **Contents**: Read and write
+   - Everything else: No access (default)
+5. Add to `~/.profile`:
    ```bash
    export LANDLOCK_GITHUB_TOKEN=github_pat_...
    ```
