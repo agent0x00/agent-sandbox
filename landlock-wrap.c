@@ -271,13 +271,8 @@ static void usage(void) {
 }
 
 int main(int argc, char **argv) {
-    if (argc < 2) {
-        usage();
-        return 1;
-    }
-
     /* Diagnostic modes (no Landlock applied) */
-    if (strcmp(argv[1], "--print-project-root") == 0) {
+    if (argc >= 2 && strcmp(argv[1], "--print-project-root") == 0) {
         char *root = find_project_root();
         if (root) {
             printf("%s\n", root);
@@ -287,7 +282,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (strcmp(argv[1], "--dump-ruleset") == 0) {
+    if (argc >= 2 && strcmp(argv[1], "--dump-ruleset") == 0) {
         PathList writes = {0};
         PathList reads = {0};
         char *extra_writes[MAX_PATHS];
@@ -304,12 +299,18 @@ int main(int argc, char **argv) {
         return 0;
     }
 
+    /* No arguments and no LANDLOCK_WRAP_CMD -> show usage */
+    if (argc < 2 && !getenv("LANDLOCK_WRAP_CMD")) {
+        usage();
+        return 1;
+    }
+
     /* Sandbox mode */
     int cmd_start = 0;
     char *extra_writes[MAX_PATHS];
     int extra_count = 0;
 
-    if (strcmp(argv[1], "--") == 0) {
+    if (argc >= 2 && strcmp(argv[1], "--") == 0) {
         cmd_start = 2;
     } else {
         for (int i = 1; i < argc; i++) {

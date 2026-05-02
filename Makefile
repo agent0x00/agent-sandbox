@@ -20,6 +20,7 @@ test:
 	tests/test_github_token.sh ./landlock-wrap
 	tests/test_pre_push.sh ./hooks/pre-push
 	tests/test_auto_discover.sh ./landlock-wrap
+	tests/test_uninstall.sh ./uninstall.sh
 
 install: build
 	install -d $(BINDIR)

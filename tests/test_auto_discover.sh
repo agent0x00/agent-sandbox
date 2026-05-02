@@ -50,7 +50,7 @@ echo "Test 2: Generic agent via LANDLOCK_WRAP_CMD"
 out=$(cd "$tmpdir" && LANDLOCK_WRAP_CMD=/bin/echo "$BINARY" hello world 2>/dev/null)
 assert_contains "$out" "hello world" "runs command via LANDLOCK_WRAP_CMD"
 
-# Test 3: Errors when no discovery possible
+# Test 3: Errors when no discovery possible (no args, no LANDLOCK_WRAP_CMD)
 echo "Test 3: Errors when no discovery and no LANDLOCK_WRAP_CMD"
 exit_code=0
 out=$(cd "$tmpdir" && "$BINARY" 2>&1) || exit_code=$?
@@ -60,6 +60,18 @@ if [ "$exit_code" -ne 0 ]; then
 else
     FAIL=$((FAIL+1))
     echo "  FAIL: should have errored" >&2
+fi
+
+# Test 4: No args with LANDLOCK_WRAP_CMD succeeds
+echo "Test 4: No args with LANDLOCK_WRAP_CMD"
+exit_code=0
+out=$(cd "$tmpdir" && LANDLOCK_WRAP_CMD=/bin/echo "$BINARY" 2>/dev/null) || exit_code=$?
+if [ "$exit_code" -eq 0 ]; then
+    PASS=$((PASS+1))
+    echo "  PASS: runs command via LANDLOCK_WRAP_CMD with no args"
+else
+    FAIL=$((FAIL+1))
+    echo "  FAIL: should have succeeded with LANDLOCK_WRAP_CMD (exit $exit_code)" >&2
 fi
 
 rm -rf "$tmpdir"
