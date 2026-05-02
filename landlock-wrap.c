@@ -148,19 +148,25 @@ static void build_ruleset(PathList *writes, PathList *reads, char **extra_writes
     pl_add(writes, "/tmp");
     pl_add(writes, "~/.cache");
     pl_add(writes, "~/.local/share");
+    pl_add(writes, "~/.local/state");
     pl_add(writes, "~/.config");
     pl_add(writes, "~/.claude");
     pl_add(writes, "~/.agents");
+    pl_add(writes, "~/.npm");
 
-    /* Built-in read-only paths */
+    /* HOME kept read-only. ~/.claude.json writes are redirected to
+     * ~/.claude/config.json via a symlink set up by claude-sandboxed. */
     pl_add(reads, "/usr");
     pl_add(reads, "/lib");
     pl_add(reads, "/lib64");
-    pl_add(reads, "/dev");
     pl_add(reads, "/proc");
     pl_add(reads, "/sys");
     pl_add(reads, "/etc");
-    pl_add(reads, "~/.gitconfig");
+    pl_add(reads, "/run");
+    pl_add(reads, "~/.nvm");
+
+    /* /dev needs write access (git writes to /dev/null) */
+    pl_add(writes, "/dev");
 
     /* Extra --write paths */
     for (int i = 0; i < extra_write_count; i++)

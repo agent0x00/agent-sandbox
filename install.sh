@@ -74,21 +74,19 @@ if ! grep -qF "$marker" "$PROFILE" 2>/dev/null; then
         cat <<EOF >> "$PROFILE"
 
 # >>> agent-sandbox >>>
-export CLAUDE_CODE_EXECUTABLE=landlock-wrap
 export LANDLOCK_GITHUB_TOKEN=$pat_input
 # <<< agent-sandbox <<<
 EOF
-        echo "  Added CLAUDE_CODE_EXECUTABLE and LANDLOCK_GITHUB_TOKEN to $PROFILE"
+        echo "  Added LANDLOCK_GITHUB_TOKEN to $PROFILE"
     else
         cat <<'EOF' >> "$PROFILE"
 
 # >>> agent-sandbox >>>
-export CLAUDE_CODE_EXECUTABLE=landlock-wrap
 # Set your GitHub PAT:
 # export LANDLOCK_GITHUB_TOKEN=github_pat_...
 # <<< agent-sandbox <<<
 EOF
-        echo "  Added CLAUDE_CODE_EXECUTABLE (PAT skipped — set it later in $PROFILE)"
+        echo "  Added sandbox config (PAT skipped — set it later in $PROFILE)"
     fi
 fi
 

@@ -2,6 +2,8 @@
 # Launcher for Claude Code inside the sandbox.
 # Finds the latest installed version and runs it through landlock-wrap.
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 VERSIONS_DIR="$HOME/.local/share/claude/versions"
 REAL_CLAUDE=$(ls -t "$VERSIONS_DIR"/* 2>/dev/null | head -1)
 
@@ -11,4 +13,31 @@ if [ -z "$REAL_CLAUDE" ]; then
 fi
 
 export LANDLOCK_WRAP_CMD="$REAL_CLAUDE"
-exec landlock-wrap "$@"
+unset CLAUDE_CODE_EXECUTABLE
+
+# Relocate HOME-root config files into ~/.claude/ so they stay accessible
+# after Landlock locks HOME down.  We use symlinks so tools see them at the
+# original paths.
+relocate() {
+    local src="$1"
+    local dst="$HOME/.claude/$2"
+
+    if [ ! -L "$src" ] && [ -f "$src" ]; then
+        mv "$src" "$dst"
+        ln -s "$dst" "$src"
+    elif [ ! -e "$src" ]; then
+        touch "$dst" 2>/dev/null || true
+        ln -s "$dst" "$src" 2>/dev/null || true
+    fi
+}
+
+relocate "$HOME/.claude.json"     "config.json"
+relocate "$HOME/.gitconfig"       "gitconfig"
+relocate "$HOME/.mcp.json"        "mcp.json"
+relocate "$HOME/CLAUDE.md"        "CLAUDE.md"
+relocate "$HOME/CLAUDE.local.md"  "CLAUDE.local.md"
+
+# Pre-create lock directory so it exists before Landlock restricts HOME
+mkdir -p "$HOME/.claude.json.lock" 2>/dev/null || true
+
+exec "$SCRIPT_DIR/landlock-wrap" "$@"

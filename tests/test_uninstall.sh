@@ -77,7 +77,6 @@ setup_env() {
 export FOO=bar
 
 # >>> agent-sandbox >>>
-export CLAUDE_CODE_EXECUTABLE=landlock-wrap
 export LANDLOCK_GITHUB_TOKEN=github_pat_test123
 # <<< agent-sandbox <<<
 BLOCK
@@ -126,7 +125,7 @@ exit_code=0
 HOME="$TEST_HOME" PREFIX="$TEST_HOME/.local" PROFILE="$TEST_HOME/.profile" bash "$SCRIPT" 2>/dev/null || exit_code=$?
 assert_exit "$exit_code" "0" "uninstall runs successfully"
 assert_not_contains "$TEST_HOME/.profile" "agent-sandbox" "agent-sandbox block removed from profile"
-assert_not_contains "$TEST_HOME/.profile" "CLAUDE_CODE_EXECUTABLE" "CLAUDE_CODE_EXECUTABLE removed from profile"
+assert_not_contains "$TEST_HOME/.profile" "CLAUDE_CODE_EXECUTABLE" "CLAUDE_CODE_EXECUTABLE not in profile"
 assert_not_contains "$TEST_HOME/.profile" "LANDLOCK_GITHUB_TOKEN" "LANDLOCK_GITHUB_TOKEN removed from profile"
 # Existing content outside the block should be preserved
 assert_exists "$TEST_HOME/.profile" "profile still exists"

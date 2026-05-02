@@ -72,7 +72,7 @@ assert_exit "$exit_code" "0" "exits 0 writing to cache"
 assert_eq "$out" "ok" "writes to ~/.cache allowed"
 rm -rf "$HOME/.cache/testdir"
 
-# Test 5: Cannot read .ssh
+# Test 5: Cannot read .ssh (HOME not in any Landlock ruleset)
 echo "Test 5: Cannot read .ssh"
 exit_code=0
 out=$(cd "$tmpdir" && "$BINARY" -- /bin/sh -c "ls \$HOME/.ssh 2>&1; echo result=\$?" 2>/dev/null) || exit_code=$?

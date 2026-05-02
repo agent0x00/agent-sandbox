@@ -11,7 +11,7 @@ rm -f "$BINDIR/landlock-wrap"
 rm -f "$BINDIR/claude-sandboxed"
 
 # Remove claude symlink only if it points to claude-sandboxed
-if [ -L "$BINDIR/claude" ] && [ "$(readlink "$BINDIR/claude")" = "claude-sandboxed" ]; then
+if [ -L "$BINDIR/claude" ] && [[ "$(readlink "$BINDIR/claude")" == */claude-sandboxed || "$(readlink "$BINDIR/claude")" == "claude-sandboxed" ]]; then
     rm -f "$BINDIR/claude"
 fi
 

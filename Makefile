@@ -21,6 +21,7 @@ test:
 	tests/test_pre_push.sh ./hooks/pre-push
 	tests/test_auto_discover.sh ./landlock-wrap
 	tests/test_uninstall.sh ./uninstall.sh
+	tests/test_install.sh ./install.sh
 
 install: build
 	install -d $(BINDIR)

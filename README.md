@@ -10,13 +10,26 @@ Three independent layers:
 
 A C binary (`landlock-wrap`) uses Linux Landlock to restrict the agent's process tree:
 
-- **Write-allowed**: `$PWD`, `/tmp`, `~/.cache`, `~/.config`, `~/.local/share`, `~/.claude`, `~/.agents`
-- **Read-only**: system directories (`/usr`, `/etc`, `/proc`, `/sys`), git config
-- **Denied**: `~/.ssh`, all other home dir paths
+- **Write-allowed**: project root, `/tmp`, `~/.cache`, `~/.local/share`, `~/.local/state`, `~/.config`, `~/.claude`, `~/.agents`, `~/.npm`, `/dev`
+- **Read-only**: `/usr`, `/lib`, `/lib64`, `/proc`, `/sys`, `/etc`, `/run`, `~/.nvm`
+- **Denied**: Everything else — including HOME (`~`), `~/.ssh`, `~/.bashrc`, `~/.profile`
 
 Landlock is enforced by the kernel — the agent cannot bypass it.
 
 Project root is auto-detected by walking up from `$PWD` until `.git` or `.sandbox-root` is found.
+
+#### How Claude Code accesses HOME files
+
+Since HOME is entirely blocked by Landlock, `claude-sandboxed` sets up symlinks **before** applying Landlock so Claude Code can still read/write its config files. These symlinks point into `~/.claude/` (which IS write-allowed):
+
+| HOME path | Symlink target |
+|-----------|---------------|
+| `~/.claude.json` | `~/.claude/config.json` |
+| `~/.gitconfig` | `~/.claude/gitconfig` |
+| `~/.mcp.json` | `~/.claude/mcp.json` |
+| `~/CLAUDE.md` | `~/.claude/CLAUDE.md` |
+| `~/CLAUDE.local.md` | `~/.claude/CLAUDE.local.md` |
+| `~/.claude.json.lock/` | pre-created directory |
 
 ### 2. Remote containment (pre-push hooks + PAT scoping)
 
@@ -57,67 +70,36 @@ Landlock containment, PAT scoping, and pre-push hooks apply uniformly regardless
 
 ### Prerequisites
 
-- Linux kernel ≥ 5.13 (Landlock)
+- Linux kernel >= 5.13 (Landlock)
 - gcc
 
 ### Install
 
-```bash
-# Build and install landlock-wrap + launcher scripts
-make install
-
-# Install global pre-push hook
-make hooks-install
-```
-
-### Claude Code
+Run the install script. It compiles the sandbox, installs binaries, creates symlinks, sets up the pre-push hook, and prompts for a GitHub PAT.
 
 ```bash
-# Replace claude symlink with sandboxed version
-make link
+./install.sh
 ```
 
-This replaces `~/.local/bin/claude` → `claude-sandboxed` → `landlock-wrap` → real claude binary. The launcher auto-discovers the latest Claude version from `~/.local/share/claude/versions/`.
+**Never run with `sudo`** — it installs for the current user only.
 
-**Zed ACP** — single line in `~/.profile`:
+The script:
+1. Compiles `landlock-wrap.c` with gcc
+2. Installs `landlock-wrap` and `claude-sandboxed` to `~/.local/bin/`
+3. Replaces `~/.local/bin/claude` with a symlink to `claude-sandboxed`
+4. Auto-detects other agents (`gemini`, `codex`) and creates sandboxed symlinks
+5. Installs the global pre-push hook
+6. Adds `LANDLOCK_GITHUB_TOKEN` to `~/.profile` (if PAT provided)
+
+After install, open a **new terminal** (or `source ~/.profile`) and run `claude`.
+
+### Uninstall
+
 ```bash
-export CLAUDE_CODE_EXECUTABLE=landlock-wrap
+./uninstall.sh
 ```
 
-The ACP server calls `landlock-wrap` instead of the bundled binary. `landlock-wrap` auto-discovers the latest Claude version from `~/.local/share/claude/versions/`, applies Landlock + PAT, then execs the real Claude. Same model picker, same UI.
-
-### Gemini CLI
-
-**Terminal**: handled by `install.sh` — detects `gemini` in PATH, creates `~/.local/bin/gemini-sandboxed → landlock-wrap`.
-
-**Zed**: Gemini uses native ACP (`gemini --experimental-acp`). No `CLAUDE_CODE_EXECUTABLE` equivalent exists. Instead, override the `command` in `~/.config/zed/settings.json`:
-```json
-"agent_servers": {
-    "gemini": {
-        "type": "registry",
-        "command": "/home/jchen/.local/bin/gemini-sandboxed"
-    }
-}
-```
-
-### Codex CLI
-
-**Terminal**: handled by `install.sh` — detects `codex` in PATH, creates `~/.local/bin/codex-sandboxed → landlock-wrap`.
-
-**Zed**: Codex uses an ACP bridge (`npx @zed-industries/codex-acp`). No equivalent env var override exists. Override the `command` in `~/.config/zed/settings.json` to point to the sandboxed symlink if the bridge spawns `codex` as a subprocess. Otherwise, sandbox only applies to terminal sessions.
-
-### GitHub PAT
-
-1. GitHub → Settings → Developer settings → Fine-grained tokens → Generate new token
-2. Resource owner: your account
-3. Repository access: "Only select repositories"
-4. Permissions (only one needed):
-   - **Contents**: Read and write
-   - Everything else: No access (default)
-5. Add to `~/.profile`:
-   ```bash
-   export LANDLOCK_GITHUB_TOKEN=github_pat_...
-   ```
+Removes all installed binaries, symlinks, hooks, and profile entries. Preserves the official `claude` binary if it exists (only removes the symlink to `claude-sandboxed`).
 
 ### Verify
 
@@ -129,20 +111,42 @@ make test
 
 ```
 agent-sandbox/
-├── landlock-wrap.c       # Core binary — Landlock, PAT, argv[0] auto-discovery
-├── Makefile              # build, test, install, link, unlink, hooks-install, clean
+├── landlock-wrap.c        # Core binary — Landlock, PAT, argv[0] auto-discovery
+├── Makefile               # build, test, install, link, unlink, hooks-install, clean
+├── install.sh             # Full installation script
+├── uninstall.sh           # Clean removal script
 ├── bin/
-│   └── claude-sandboxed  # Claude-specific launcher with version auto-discovery
+│   └── claude-sandboxed   # Claude launcher — version discovery, symlink setup, Landlock exec
 ├── hooks/
-│   └── pre-push          # Global pre-push hook
+│   └── pre-push           # Global pre-push hook
 └── tests/
     ├── test_project_root.sh
     ├── test_ruleset.sh
     ├── test_enforcement.sh
     ├── test_github_token.sh
     ├── test_pre_push.sh
-    └── test_auto_discover.sh
+    ├── test_auto_discover.sh
+    ├── test_install.sh
+    └── test_uninstall.sh
 ```
+
+## Design decisions & known constraints
+
+### Why HOME is fully blocked
+
+Landlock works at directory granularity — you can allow or deny access to a directory tree, but you cannot selectively allow a single file while blocking its siblings. If HOME were in the read list, `~/.ssh/id_ed25519` would be readable. To prevent this, HOME is absent from all Landlock rulesets. Symlinks redirect the specific files Claude Code needs into `~/.claude/`.
+
+### Why /dev is write-allowed
+
+Git and other tools open `/dev/null` for writing. Landlock treats `/dev/null` as a file beneath `/dev`, so `/dev` must be write-allowed for these operations to succeed. Device files are protected by Unix permissions — the security risk is minimal.
+
+### Why /run is read-only
+
+`/etc/resolv.conf` is a symlink to `/run/systemd/resolve/stub-resolv.conf` on systemd-resolved systems. Without `/run` readable, DNS resolution fails and Claude Code cannot make API calls.
+
+### Why CLAUDE_CODE_EXECUTABLE is not set globally
+
+Setting `CLAUDE_CODE_EXECUTABLE=landlock-wrap` in `~/.profile` breaks external tools (Zed, VS Code) that read this env var to find the Claude binary. It also poisons Claude Code's own internal process spawning — Claude Code tries to exec `landlock-wrap` as its native binary, but `landlock-wrap` expects `LANDLOCK_WRAP_CMD` to be set. `claude-sandboxed` explicitly unsets this env var as a safeguard against stale values.
 
 ## Reverting
 

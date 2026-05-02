@@ -94,10 +94,17 @@ assert_symlink "$FAKE_PREFIX/bin/codex-sandboxed" "codex symlink created"
 echo "Test 4: Pre-push hook"
 assert_exists "$TEST_HOME/.config/git/hooks/pre-push" "pre-push hook installed"
 
-# Test 5: Profile setup with PAT prompt (token provided)
+# Test 5: Profile setup without PAT (non-interactive)
 echo "Test 5: Profile setup with PAT"
 # Non-interactive run should get commented placeholder since no TTY
-assert_file_contains "$FAKE_PROFILE" "CLAUDE_CODE_EXECUTABLE" "CLAUDE_CODE_EXECUTABLE in profile"
+# CLAUDE_CODE_EXECUTABLE must NOT be set globally (breaks Zed and other tools)
+if ! grep -qF "CLAUDE_CODE_EXECUTABLE" "$FAKE_PROFILE" 2>/dev/null; then
+    PASS=$((PASS+1))
+    echo "  PASS: CLAUDE_CODE_EXECUTABLE not in profile"
+else
+    FAIL=$((FAIL+1))
+    echo "  FAIL: CLAUDE_CODE_EXECUTABLE should not be in profile" >&2
+fi
 assert_file_contains "$FAKE_PROFILE" "LANDLOCK_GITHUB_TOKEN" "LANDLOCK_GITHUB_TOKEN placeholder in profile"
 
 # Test 6: Interactive PAT prompt — pipe a token
