@@ -97,13 +97,13 @@ assert_exists "$TEST_HOME/.config/git/hooks/pre-push" "pre-push hook installed"
 # Test 5: Profile setup without PAT (non-interactive)
 echo "Test 5: Profile setup with PAT"
 # Non-interactive run should get commented placeholder since no TTY
-# CLAUDE_CODE_EXECUTABLE must NOT be set globally (breaks Zed and other tools)
-if ! grep -qF "CLAUDE_CODE_EXECUTABLE" "$FAKE_PROFILE" 2>/dev/null; then
+# CLAUDE_CODE_EXECUTABLE must be set so external tools (Zed, etc.) route through landlock-wrap
+if grep -qF "CLAUDE_CODE_EXECUTABLE=" "$FAKE_PROFILE" 2>/dev/null; then
     PASS=$((PASS+1))
-    echo "  PASS: CLAUDE_CODE_EXECUTABLE not in profile"
+    echo "  PASS: CLAUDE_CODE_EXECUTABLE in profile"
 else
     FAIL=$((FAIL+1))
-    echo "  FAIL: CLAUDE_CODE_EXECUTABLE should not be in profile" >&2
+    echo "  FAIL: CLAUDE_CODE_EXECUTABLE should be in profile" >&2
 fi
 assert_file_contains "$FAKE_PROFILE" "LANDLOCK_GITHUB_TOKEN" "LANDLOCK_GITHUB_TOKEN placeholder in profile"
 

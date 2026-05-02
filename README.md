@@ -154,9 +154,9 @@ Git and other tools open `/dev/null` for writing. Landlock treats `/dev/null` as
 
 `/etc/resolv.conf` is a symlink to `/run/systemd/resolve/stub-resolv.conf` on systemd-resolved systems. Without `/run` readable, DNS resolution fails and Claude Code cannot make API calls.
 
-### Why CLAUDE_CODE_EXECUTABLE is not set globally
+### Why CLAUDE_CODE_EXECUTABLE is set globally
 
-Setting `CLAUDE_CODE_EXECUTABLE=landlock-wrap` in `~/.profile` breaks external tools (Zed, VS Code) that read this env var to find the Claude binary. It also poisons Claude Code's own internal process spawning — Claude Code tries to exec `landlock-wrap` as its native binary, but `landlock-wrap` expects `LANDLOCK_WRAP_CMD` to be set. `claude-sandboxed` explicitly unsets this env var as a safeguard against stale values.
+`CLAUDE_CODE_EXECUTABLE` is set in `~/.profile` so external tools (Zed, VS Code) that read this env var to find the Claude binary route through the sandboxed `claude-sandboxed` wrapper. `claude-sandboxed` sets `LANDLOCK_WRAP_CMD` internally so `landlock-wrap` knows which binary to run.
 
 ## Reverting
 
