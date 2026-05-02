@@ -40,7 +40,7 @@ Since HOME is entirely blocked by Landlock, `claude-sandboxed` sets up symlinks 
 - Blocks force pushes to any branch
 
 **GitHub PAT scoping**:
-- A fine-grained PAT scoped to specific repos (Contents: Read & Write)
+- A fine-grained PAT scoped to specific repos (Contents: Read & Write, Pull requests: Read & Write)
 - The wrapper rewrites `git@github.com:` URLs to HTTPS with the PAT
 - `SSH_AUTH_SOCK` is unset so SSH auth is impossible
 - Sandbox literally cannot push to repos the PAT wasn't granted access to

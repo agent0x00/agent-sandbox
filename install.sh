@@ -56,10 +56,11 @@ marker="# >>> agent-sandbox >>>"
 if ! grep -qF "$marker" "$PROFILE" 2>/dev/null; then
     echo ""
     echo "=== GitHub PAT ==="
-    echo "The sandbox uses a fine-grained PAT for git auth."
+    echo "The sandbox uses a fine-grained PAT for git auth and PR creation."
     echo "Create one at: GitHub → Settings → Developer settings → Fine-grained tokens"
     echo "  - Repository access: Only select repositories"
     echo "  - Permissions: Contents → Read and write"
+    echo "  - Permissions: Pull requests → Read and write (needed for PR creation)"
     echo ""
     if [ -t 0 ] && [ -e /dev/tty ]; then
         read -r -p "Enter your GitHub PAT (or press Enter to skip): " pat_input </dev/tty || true
