@@ -58,6 +58,40 @@ echo "Test 4: Extra --write paths"
 got=$(cd "$tmpdir" && "$BINARY" --dump-ruleset --write /foo/bar 2>&1)
 assert_contains "$got" "write:/foo/bar" "extra --write path added"
 
+# Test 5: .bash_history excluded from ruleset
+echo "Test 5: bash_history excluded from ruleset"
+got=$(cd "$tmpdir" && "$BINARY" --dump-ruleset 2>&1)
+if echo "$got" | grep -qF ".bash_history"; then
+    FAIL=$((FAIL+1))
+    echo "  FAIL: .bash_history should not appear in ruleset" >&2
+else
+    PASS=$((PASS+1))
+    echo "  PASS: .bash_history excluded from ruleset"
+fi
+
+# Test 6: .gnupg excluded from ruleset
+echo "Test 6: .gnupg excluded from ruleset"
+if echo "$got" | grep -qF ".gnupg"; then
+    FAIL=$((FAIL+1))
+    echo "  FAIL: .gnupg should not appear in ruleset" >&2
+else
+    PASS=$((PASS+1))
+    echo "  PASS: .gnupg excluded from ruleset"
+fi
+
+# Test 7: Essential read paths are present
+echo "Test 7: Essential read paths present"
+assert_contains "$got" "read:/usr"  "/usr is in read paths"
+assert_contains "$got" "read:/lib"  "/lib is in read paths"
+assert_contains "$got" "read:/lib64" "/lib64 is in read paths"
+assert_contains "$got" "read:/proc" "/proc is in read paths"
+assert_contains "$got" "read:/etc"  "/etc is in read paths"
+
+# Test 8: Essential write paths are present
+echo "Test 8: Essential write paths present"
+assert_contains "$got" "write:/tmp" "/tmp is in write paths"
+assert_contains "$got" "write:/dev" "/dev is in write paths"
+
 rm -rf "$tmpdir"
 
 echo ""

@@ -72,11 +72,18 @@ struct ll_path_beneath_attr {
                       LANDLOCK_ACCESS_FS_MAKE_DIR | \
                       LANDLOCK_ACCESS_FS_MAKE_REG | \
                       LANDLOCK_ACCESS_FS_MAKE_SOCK | \
+                      LANDLOCK_ACCESS_FS_MAKE_FIFO | \
                       LANDLOCK_ACCESS_FS_MAKE_SYM | \
                       LANDLOCK_ACCESS_FS_REFER | \
                       LANDLOCK_ACCESS_FS_TRUNCATE)
 
-#define ACCESS_FS_HANDLED ACCESS_FS_RW
+/* Any access right not in the handled set is implicitly allowed by the
+ * kernel regardless of ruleset entries.  MAKE_CHAR and MAKE_BLOCK
+ * require CAP_MKNOD (dropped by NoNewPrivs) but are included for
+ * defense-in-depth in case privileges change. */
+#define ACCESS_FS_HANDLED (ACCESS_FS_RW | \
+                           LANDLOCK_ACCESS_FS_MAKE_CHAR | \
+                           LANDLOCK_ACCESS_FS_MAKE_BLOCK)
 
 /* ---- Utilities ---- */
 
