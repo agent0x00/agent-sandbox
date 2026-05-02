@@ -70,18 +70,21 @@ if ! grep -qF "$marker" "$PROFILE" 2>/dev/null; then
     echo ""
     echo "Adding sandbox config to $PROFILE..."
 
+    claude_exe="$BINDIR/claude-sandboxed"
     if [ -n "$pat_input" ]; then
         cat <<EOF >> "$PROFILE"
 
 # >>> agent-sandbox >>>
+export CLAUDE_CODE_EXECUTABLE=$claude_exe
 export LANDLOCK_GITHUB_TOKEN=$pat_input
 # <<< agent-sandbox <<<
 EOF
-        echo "  Added LANDLOCK_GITHUB_TOKEN to $PROFILE"
+        echo "  Added CLAUDE_CODE_EXECUTABLE and LANDLOCK_GITHUB_TOKEN to $PROFILE"
     else
-        cat <<'EOF' >> "$PROFILE"
+        cat <<EOF >> "$PROFILE"
 
 # >>> agent-sandbox >>>
+export CLAUDE_CODE_EXECUTABLE=$claude_exe
 # Set your GitHub PAT:
 # export LANDLOCK_GITHUB_TOKEN=github_pat_...
 # <<< agent-sandbox <<<

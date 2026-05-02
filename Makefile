@@ -22,6 +22,7 @@ test:
 	tests/test_auto_discover.sh ./landlock-wrap
 	tests/test_uninstall.sh ./uninstall.sh
 	tests/test_install.sh ./install.sh
+	tests/test_claude_code_executable.sh
 
 install: build
 	install -d $(BINDIR)
