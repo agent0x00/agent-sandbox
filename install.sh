@@ -54,16 +54,42 @@ git config --global core.hooksPath "$HOOKDIR" 2>/dev/null || true
 marker="# >>> agent-sandbox >>>"
 
 if ! grep -qF "$marker" "$PROFILE" 2>/dev/null; then
+    echo ""
+    echo "=== GitHub PAT ==="
+    echo "The sandbox uses a fine-grained PAT for git auth."
+    echo "Create one at: GitHub → Settings → Developer settings → Fine-grained tokens"
+    echo "  - Repository access: Only select repositories"
+    echo "  - Permissions: Contents → Read and write"
+    echo ""
+    if [ -t 0 ] && [ -e /dev/tty ]; then
+        read -r -p "Enter your GitHub PAT (or press Enter to skip): " pat_input </dev/tty || true
+    else
+        read -r -p "Enter your GitHub PAT (or press Enter to skip): " pat_input || true
+    fi
+
+    echo ""
     echo "Adding sandbox config to $PROFILE..."
-    cat <<'EOF' >> "$PROFILE"
+
+    if [ -n "$pat_input" ]; then
+        cat <<EOF >> "$PROFILE"
 
 # >>> agent-sandbox >>>
 export CLAUDE_CODE_EXECUTABLE=landlock-wrap
-# Uncomment and set your GitHub PAT:
+export LANDLOCK_GITHUB_TOKEN=$pat_input
+# <<< agent-sandbox <<<
+EOF
+        echo "  Added CLAUDE_CODE_EXECUTABLE and LANDLOCK_GITHUB_TOKEN to $PROFILE"
+    else
+        cat <<'EOF' >> "$PROFILE"
+
+# >>> agent-sandbox >>>
+export CLAUDE_CODE_EXECUTABLE=landlock-wrap
+# Set your GitHub PAT:
 # export LANDLOCK_GITHUB_TOKEN=github_pat_...
 # <<< agent-sandbox <<<
 EOF
-    echo "  Added CLAUDE_CODE_EXECUTABLE and PAT placeholder to $PROFILE"
+        echo "  Added CLAUDE_CODE_EXECUTABLE (PAT skipped — set it later in $PROFILE)"
+    fi
 fi
 
 # ---- Summary ----
@@ -74,7 +100,8 @@ echo "Claude symlink:   $BINDIR/claude -> $BINDIR/claude-sandboxed"
 echo "Pre-push hook:    $HOOKDIR/pre-push"
 echo "Profile entries:  $PROFILE ($marker block)"
 echo ""
-echo "Next steps:"
-echo "  1. Restart your shell or run: source $PROFILE"
-echo "  2. Create a GitHub PAT (Settings → Developer settings → Fine-grained tokens)"
-echo "  3. Uncomment LANDLOCK_GITHUB_TOKEN in $PROFILE and set your PAT"
+if [ -n "${pat_input:-}" ]; then
+    echo "PAT configured. Run: source $PROFILE"
+else
+    echo "PAT not set. To configure later, edit $PROFILE and set LANDLOCK_GITHUB_TOKEN"
+fi

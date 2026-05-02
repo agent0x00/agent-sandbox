@@ -94,13 +94,29 @@ assert_symlink "$FAKE_PREFIX/bin/codex-sandboxed" "codex symlink created"
 echo "Test 4: Pre-push hook"
 assert_exists "$TEST_HOME/.config/git/hooks/pre-push" "pre-push hook installed"
 
-# Test 5: Profile setup
-echo "Test 5: Profile setup"
+# Test 5: Profile setup with PAT prompt (token provided)
+echo "Test 5: Profile setup with PAT"
+# Non-interactive run should get commented placeholder since no TTY
 assert_file_contains "$FAKE_PROFILE" "CLAUDE_CODE_EXECUTABLE" "CLAUDE_CODE_EXECUTABLE in profile"
-assert_file_contains "$FAKE_PROFILE" "LANDLOCK_GITHUB_TOKEN" "LANDLOCK_GITHUB_TOKEN commented placeholder in profile"
+assert_file_contains "$FAKE_PROFILE" "LANDLOCK_GITHUB_TOKEN" "LANDLOCK_GITHUB_TOKEN placeholder in profile"
 
-# Test 6: Idempotent (running twice doesn't break)
-echo "Test 6: Idempotent"
+# Test 6: Interactive PAT prompt — pipe a token
+echo "Test 6: PAT prompt accepts token"
+TEST_HOME2=$(mktemp -d)
+FAKE_PREFIX2="$TEST_HOME2/.local"
+FAKE_PROFILE2="$TEST_HOME2/.profile"
+FAKE_PATH2="$FAKE_PREFIX2/bin:/usr/bin:/bin"
+mkdir -p "$FAKE_PREFIX2/bin"
+mkdir -p "$TEST_HOME2/.local/share/claude/versions"
+touch "$TEST_HOME2/.local/share/claude/versions/2.1.123"
+chmod +x "$TEST_HOME2/.local/share/claude/versions/2.1.123"
+# Pipe a token into the script
+echo "github_pat_test123" | HOME="$TEST_HOME2" PREFIX="$FAKE_PREFIX2" PROFILE="$FAKE_PROFILE2" PATH="$FAKE_PATH2" bash "$SCRIPT" 2>/dev/null || true
+assert_file_contains "$FAKE_PROFILE2" "LANDLOCK_GITHUB_TOKEN=github_pat_test123" "LANDLOCK_GITHUB_TOKEN set from prompt"
+rm -rf "$TEST_HOME2"
+
+# Test 7: Idempotent (running twice doesn't break)
+echo "Test 7: Idempotent"
 exit_code=0
 HOME="$TEST_HOME" PREFIX="$FAKE_PREFIX" PROFILE="$FAKE_PROFILE" PATH="$FAKE_PATH" bash "$SCRIPT" 2>/dev/null || exit_code=$?
 assert_exit "$exit_code" "0" "second run succeeds"
