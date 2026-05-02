@@ -1,0 +1,14 @@
+#!/bin/bash
+# Launcher for Claude Code inside the sandbox.
+# Finds the latest installed version and runs it through landlock-wrap.
+
+VERSIONS_DIR="$HOME/.local/share/claude/versions"
+REAL_CLAUDE=$(ls -t "$VERSIONS_DIR"/* 2>/dev/null | head -1)
+
+if [ -z "$REAL_CLAUDE" ]; then
+    echo "claude-sandboxed: no Claude Code binary found in $VERSIONS_DIR" >&2
+    exit 1
+fi
+
+export LANDLOCK_WRAP_CMD="$REAL_CLAUDE"
+exec landlock-wrap "$@"
