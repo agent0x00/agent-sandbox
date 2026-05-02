@@ -8,6 +8,7 @@
 #include <sys/prctl.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <dirent.h>
 
 #define PATH_MAX_LEN 4096
 #define MAX_PATHS 64
@@ -342,25 +343,105 @@ int main(int argc, char **argv) {
     }
 
     /* Determine what to exec */
-    char *cmd_argv[MAX_PATHS];
     if (cmd_start && cmd_start < argc) {
         /* Wrapper mode: command after -- */
         execvp(argv[cmd_start], &argv[cmd_start]);
     } else {
-        /* Direct replacement mode: exec the configured command */
+        /* Direct replacement mode: discover and exec the real binary */
         const char *wrap_cmd = getenv("LANDLOCK_WRAP_CMD");
+
         if (!wrap_cmd) {
-            fprintf(stderr,
-                "landlock-wrap: no command specified. Use -- COMMAND or set LANDLOCK_WRAP_CMD\n");
-            pl_free(&writes);
-            pl_free(&reads);
-            return 1;
+            /* Auto-discover from argv[0] basename */
+            char *base = strrchr(argv[0], '/');
+            base = base ? base + 1 : argv[0];
+
+            if (strcmp(base, "landlock-wrap") == 0) {
+                /* Fallback: try Claude versions directory */
+                const char *home = getenv("HOME");
+                if (home) {
+                    char ver_dir[PATH_MAX_LEN];
+                    snprintf(ver_dir, sizeof(ver_dir),
+                             "%s/.local/share/claude/versions", home);
+                    DIR *d = opendir(ver_dir);
+                    if (d) {
+                        struct dirent *ent;
+                        char *latest = NULL;
+                        while ((ent = readdir(d))) {
+                            if (ent->d_name[0] == '.') continue;
+                            if (!latest || strcmp(ent->d_name, latest) > 0)
+                                latest = ent->d_name;
+                        }
+                        closedir(d);
+                        if (latest) {
+                            char *claude_path = malloc(PATH_MAX_LEN);
+                            snprintf(claude_path, PATH_MAX_LEN,
+                                     "%s/%s", ver_dir, latest);
+                            wrap_cmd = claude_path;
+                        }
+                    }
+                }
+                if (!wrap_cmd) {
+                    fprintf(stderr,
+                        "landlock-wrap: no command specified. "
+                        "Use -- COMMAND, set LANDLOCK_WRAP_CMD, "
+                        "or invoke via symlink named after the agent\n");
+                    pl_free(&writes);
+                    pl_free(&reads);
+                    return 1;
+                }
+            }
+
+            /* Strip known suffixes to find the real binary name */
+            char agent_name[PATH_MAX_LEN];
+            strncpy(agent_name, base, sizeof(agent_name) - 1);
+            agent_name[sizeof(agent_name) - 1] = '\0';
+
+            char *suffix;
+            const char *suffixes[] = {"-sandboxed", "-wrapper", "-wrapped", NULL};
+            for (int s = 0; suffixes[s]; s++) {
+                suffix = strstr(agent_name, suffixes[s]);
+                if (suffix) {
+                    *suffix = '\0';
+                    break;
+                }
+            }
+
+            /* Search PATH for the agent binary */
+            char *found = NULL;
+            char *path_env = strdup(getenv("PATH") ? getenv("PATH") : "");
+            char *dir = strtok(path_env, ":");
+            while (dir) {
+                char candidate[PATH_MAX_LEN];
+                snprintf(candidate, sizeof(candidate), "%s/%s", dir, agent_name);
+                if (access(candidate, X_OK) == 0) {
+                    found = strdup(candidate);
+                    break;
+                }
+                dir = strtok(NULL, ":");
+            }
+            free(path_env);
+
+            if (!found) {
+                fprintf(stderr,
+                    "landlock-wrap: could not find '%s' in PATH. "
+                    "Set LANDLOCK_WRAP_CMD or create a symlink.\n",
+                    agent_name);
+                pl_free(&writes);
+                pl_free(&reads);
+                return 1;
+            }
+            wrap_cmd = found;
         }
+
+        char *cmd_argv[MAX_PATHS];
         cmd_argv[0] = (char *)wrap_cmd;
         for (int i = 1; i < argc; i++)
             cmd_argv[i] = argv[i];
         cmd_argv[argc] = NULL;
         execvp(cmd_argv[0], cmd_argv);
+        /* If wrap_cmd was allocated by auto-discovery, free it (unreachable after exec) */
+        if (wrap_cmd != getenv("LANDLOCK_WRAP_CMD"))
+            free((char *)wrap_cmd);
     }
     perror("execvp");
     pl_free(&writes);

@@ -1,6 +1,6 @@
 # agent-sandbox
 
-OS-level containment for AI agent development. The sandbox gives agents full freedom inside a project directory while preventing damage to the workstation and remote resources.
+OS-level containment for AI agent development. The sandbox gives agents full freedom inside a project directory while preventing damage to the workstation and remote resources. Works with Claude Code, Gemini CLI, Codex, and any other agent.
 
 ## Architecture
 
@@ -30,10 +30,28 @@ Project root is auto-detected by walking up from `$PWD` until `.git` or `.sandbo
 - `SSH_AUTH_SOCK` is unset so SSH auth is impossible
 - Sandbox literally cannot push to repos the PAT wasn't granted access to
 
-### 3. Integration
+### 3. Agent integration
 
-- **Terminal**: `~/.local/bin/claude` symlink → `claude-sandboxed` wrapper → `landlock-wrap` → real claude binary
-- **Zed ACP**: `CLAUDE_CODE_EXECUTABLE=landlock-wrap` in `~/.profile`
+The sandbox wraps any agent binary through the same Landlock + PAT boundary. Three integration methods, in order of seamlessness:
+
+**A) Symlink (recommended)**. Create a symlink from the agent's name to `landlock-wrap`. The wrapper auto-discovers the real binary via PATH:
+```bash
+ln -s ~/.local/bin/landlock-wrap ~/.local/bin/gemini-cli
+ln -s ~/.local/bin/landlock-wrap ~/.local/bin/codex
+```
+When invoked as `gemini-cli`, the wrapper sees its argv[0], strips any suffix (`-sandboxed`, `-wrapper`), finds the real `gemini-cli` in PATH, and execs it after applying Landlock.
+
+**B) `LANDLOCK_WRAP_CMD`**. Set an env var pointing to the agent binary:
+```bash
+LANDLOCK_WRAP_CMD=/path/to/gemini-cli landlock-wrap --prompt "hello"
+```
+
+**C) Wrapper mode**. Prefix the agent command with `landlock-wrap --`:
+```bash
+landlock-wrap -- gemini-cli --prompt "hello"
+```
+
+Landlock containment, PAT scoping, and pre-push hooks apply uniformly regardless of which agent is inside.
 
 ## Setup
 
@@ -45,14 +63,53 @@ Project root is auto-detected by walking up from `$PWD` until `.git` or `.sandbo
 ### Install
 
 ```bash
-# Build, install binary and launcher
+# Build and install landlock-wrap + launcher scripts
 make install
-
-# Replace claude symlink with sandboxed version
-make link
 
 # Install global pre-push hook
 make hooks-install
+```
+
+### Claude Code
+
+```bash
+# Replace claude symlink with sandboxed version
+make link
+```
+
+This replaces `~/.local/bin/claude` → `claude-sandboxed` → `landlock-wrap` → real claude binary. The launcher auto-discovers the latest Claude version from `~/.local/share/claude/versions/`.
+
+**Zed ACP** — single line in `~/.profile`:
+```bash
+export CLAUDE_CODE_EXECUTABLE=landlock-wrap
+```
+
+The ACP server calls `landlock-wrap` instead of the bundled binary. `landlock-wrap` auto-discovers the latest Claude version from `~/.local/share/claude/versions/`, applies Landlock + PAT, then execs the real Claude. Same model picker, same UI.
+
+### Gemini CLI
+
+Option A (symlink):
+```bash
+ln -s ~/.local/bin/landlock-wrap ~/.local/bin/gemini-cli-sandboxed
+alias gemini-cli='gemini-cli-sandboxed'
+```
+
+Option B (alias):
+```bash
+alias gemini-cli='landlock-wrap -- gemini-cli'
+```
+
+### Codex
+
+Option A (symlink):
+```bash
+ln -s ~/.local/bin/landlock-wrap ~/.local/bin/codex-sandboxed
+alias codex='codex-sandboxed'
+```
+
+Option B (alias):
+```bash
+alias codex='landlock-wrap -- codex'
 ```
 
 ### GitHub PAT
@@ -68,13 +125,6 @@ make hooks-install
    export LANDLOCK_GITHUB_TOKEN=github_pat_...
    ```
 
-### Zed ACP
-
-Add to `~/.profile`:
-```bash
-export CLAUDE_CODE_EXECUTABLE=landlock-wrap
-```
-
 ### Verify
 
 ```bash
@@ -85,10 +135,10 @@ make test
 
 ```
 agent-sandbox/
-├── landlock-wrap.c       # Core binary — Landlock enforcement, PAT setup, project root detection
+├── landlock-wrap.c       # Core binary — Landlock, PAT, argv[0] auto-discovery
 ├── Makefile              # build, test, install, link, unlink, hooks-install, clean
 ├── bin/
-│   └── claude-sandboxed  # Launcher that finds latest Claude version and runs sandboxed
+│   └── claude-sandboxed  # Claude-specific launcher with version auto-discovery
 ├── hooks/
 │   └── pre-push          # Global pre-push hook
 └── tests/
@@ -96,7 +146,8 @@ agent-sandbox/
     ├── test_ruleset.sh
     ├── test_enforcement.sh
     ├── test_github_token.sh
-    └── test_pre_push.sh
+    ├── test_pre_push.sh
+    └── test_auto_discover.sh
 ```
 
 ## Reverting
