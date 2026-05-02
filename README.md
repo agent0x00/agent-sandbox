@@ -36,19 +36,19 @@ The sandbox wraps any agent binary through the same Landlock + PAT boundary. Thr
 
 **A) Symlink (recommended)**. Create a symlink from the agent's name to `landlock-wrap`. The wrapper auto-discovers the real binary via PATH:
 ```bash
-ln -s ~/.local/bin/landlock-wrap ~/.local/bin/gemini-cli
+ln -s ~/.local/bin/landlock-wrap ~/.local/bin/gemini
 ln -s ~/.local/bin/landlock-wrap ~/.local/bin/codex
 ```
-When invoked as `gemini-cli`, the wrapper sees its argv[0], strips any suffix (`-sandboxed`, `-wrapper`), finds the real `gemini-cli` in PATH, and execs it after applying Landlock.
+When invoked as `gemini`, the wrapper sees its argv[0], strips any suffix (`-sandboxed`, `-wrapper`), finds the real `gemini` in PATH, and execs it after applying Landlock.
 
 **B) `LANDLOCK_WRAP_CMD`**. Set an env var pointing to the agent binary:
 ```bash
-LANDLOCK_WRAP_CMD=/path/to/gemini-cli landlock-wrap --prompt "hello"
+LANDLOCK_WRAP_CMD=/path/to/gemini landlock-wrap --prompt "hello"
 ```
 
 **C) Wrapper mode**. Prefix the agent command with `landlock-wrap --`:
 ```bash
-landlock-wrap -- gemini-cli --prompt "hello"
+landlock-wrap -- gemini --prompt "hello"
 ```
 
 Landlock containment, PAT scoping, and pre-push hooks apply uniformly regardless of which agent is inside.
@@ -88,29 +88,23 @@ The ACP server calls `landlock-wrap` instead of the bundled binary. `landlock-wr
 
 ### Gemini CLI
 
-Option A (symlink):
-```bash
-ln -s ~/.local/bin/landlock-wrap ~/.local/bin/gemini-cli-sandboxed
-alias gemini-cli='gemini-cli-sandboxed'
+**Terminal**: handled by `install.sh` — detects `gemini` in PATH, creates `~/.local/bin/gemini-sandboxed → landlock-wrap`.
+
+**Zed**: Gemini uses native ACP (`gemini --experimental-acp`). No `CLAUDE_CODE_EXECUTABLE` equivalent exists. Instead, override the `command` in `~/.config/zed/settings.json`:
+```json
+"agent_servers": {
+    "gemini": {
+        "type": "registry",
+        "command": "/home/jchen/.local/bin/gemini-sandboxed"
+    }
+}
 ```
 
-Option B (alias):
-```bash
-alias gemini-cli='landlock-wrap -- gemini-cli'
-```
+### Codex CLI
 
-### Codex
+**Terminal**: handled by `install.sh` — detects `codex` in PATH, creates `~/.local/bin/codex-sandboxed → landlock-wrap`.
 
-Option A (symlink):
-```bash
-ln -s ~/.local/bin/landlock-wrap ~/.local/bin/codex-sandboxed
-alias codex='codex-sandboxed'
-```
-
-Option B (alias):
-```bash
-alias codex='landlock-wrap -- codex'
-```
+**Zed**: Codex uses an ACP bridge (`npx @zed-industries/codex-acp`). No equivalent env var override exists. Override the `command` in `~/.config/zed/settings.json` to point to the sandboxed symlink if the bridge spawns `codex` as a subprocess. Otherwise, sandbox only applies to terminal sessions.
 
 ### GitHub PAT
 
