@@ -117,8 +117,8 @@ mkdir -p "$FAKE_PREFIX2/bin"
 mkdir -p "$TEST_HOME2/.local/share/claude/versions"
 touch "$TEST_HOME2/.local/share/claude/versions/2.1.123"
 chmod +x "$TEST_HOME2/.local/share/claude/versions/2.1.123"
-# Pipe a token into the script
-echo "github_pat_test123" | HOME="$TEST_HOME2" PREFIX="$FAKE_PREFIX2" PROFILE="$FAKE_PROFILE2" PATH="$FAKE_PATH2" bash "$SCRIPT" 2>/dev/null || true
+# Pipe a token into the script (unset env var so script prompts)
+echo "github_pat_test123" | HOME="$TEST_HOME2" PREFIX="$FAKE_PREFIX2" PROFILE="$FAKE_PROFILE2" PATH="$FAKE_PATH2" LANDLOCK_GITHUB_TOKEN= bash "$SCRIPT" 2>/dev/null || true
 assert_file_contains "$FAKE_PROFILE2" "LANDLOCK_GITHUB_TOKEN=github_pat_test123" "LANDLOCK_GITHUB_TOKEN set from prompt"
 rm -rf "$TEST_HOME2"
 
