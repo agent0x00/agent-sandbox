@@ -43,4 +43,11 @@ if grep -qF "$marker" "$PROFILE" 2>/dev/null; then
     echo "Profile block removed."
 fi
 
+# Clean up hooks.protect-main from the sandbox repo if present
+SANDBOX_DIR="$(cd "$(dirname "$0")" && pwd)"
+if (cd "$SANDBOX_DIR" && git config --get hooks.protect-main 2>/dev/null | grep -q true); then
+    (cd "$SANDBOX_DIR" && git config --unset hooks.protect-main 2>/dev/null || true)
+    echo "hooks.protect-main unset for sandbox repo."
+fi
+
 echo "Binaries removed."

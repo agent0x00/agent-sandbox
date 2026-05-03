@@ -49,6 +49,8 @@ echo "Installing pre-push hook..."
 install -d "$HOOKDIR"
 install -m 755 "$SANDBOX_DIR/hooks/pre-push" "$HOOKDIR/pre-push"
 git config --global core.hooksPath "$HOOKDIR" 2>/dev/null || true
+# Enable main protection for the sandbox repo itself
+(cd "$SANDBOX_DIR" && git config hooks.protect-main true 2>/dev/null || true)
 
 # ---- Profile setup ----
 marker="# >>> agent-sandbox >>>"

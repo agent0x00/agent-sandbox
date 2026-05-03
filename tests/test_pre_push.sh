@@ -18,24 +18,6 @@ assert_exit() {
 
 echo "=== Pre-push hook tests ==="
 
-# Test 1: Block push to existing main branch
-echo "Test 1: Block push to existing main"
-exit_code=0
-echo "refs/heads/main deadbeef1234 refs/heads/main cafebabe5678" | bash "$HOOK" 2>/dev/null || exit_code=$?
-assert_exit "$exit_code" "1" "push to existing main is blocked"
-
-# Test 2: Block push to existing master
-echo "Test 2: Block push to existing master"
-exit_code=0
-echo "refs/heads/master deadbeef1234 refs/heads/master cafebabe5678" | bash "$HOOK" 2>/dev/null || exit_code=$?
-assert_exit "$exit_code" "1" "push to existing master is blocked"
-
-# Test: Allow initial push to main (remote doesn't exist yet — remote_sha is all zeros)
-echo "Test 3: Allow initial push to main"
-exit_code=0
-echo "refs/heads/main 0000000000000000000000000000000000000000 refs/heads/main 0000000000000000000000000000000000000000" | bash "$HOOK" 2>/dev/null || exit_code=$?
-assert_exit "$exit_code" "0" "initial push to main allowed (remote_sha is zero)"
-echo "Tests 4-5: Force push detection (real repo)"
 tmpdir=$(mktemp -d)
 cd "$tmpdir"
 git init --quiet --initial-branch=trunk
@@ -49,24 +31,49 @@ git checkout -b feature --quiet
 echo feat > a && git add a && git commit -m "feature" --quiet
 FEAT_SHA=$(git rev-parse feature)
 
-# Test 4: Normal push to feature branch (BASE is ancestor of FEAT)
-echo "Test 4: Allow normal push to feature branch"
+# Create a main branch for testing
+git branch main trunk
+
+# Test 1: Default (no protect-main config) — push to main allowed
+echo "Test 1: Default allows push to main"
+exit_code=0
+echo "refs/heads/main $FEAT_SHA refs/heads/main $BASE_SHA" | bash "$HOOK" 2>/dev/null || exit_code=$?
+assert_exit "$exit_code" "0" "push to main allowed by default"
+
+# Test 2: With hooks.protect-main=true — push to main blocked
+echo "Test 2: hooks.protect-main blocks push to main"
+git config hooks.protect-main true
+exit_code=0
+echo "refs/heads/main $FEAT_SHA refs/heads/main $BASE_SHA" | bash "$HOOK" 2>/dev/null || exit_code=$?
+assert_exit "$exit_code" "1" "push to main blocked when hooks.protect-main=true"
+
+# Test 3: hooks.protect-main still allows initial push (zero remote_sha)
+echo "Test 3: Initial push to main allowed with protection enabled"
+exit_code=0
+echo "refs/heads/main $FEAT_SHA refs/heads/main 0000000000000000000000000000000000000000" | bash "$HOOK" 2>/dev/null || exit_code=$?
+assert_exit "$exit_code" "0" "initial push to main allowed (remote_sha is zero)"
+
+# Test 4: master also blocked when protect-main is true
+echo "Test 4: hooks.protect-main blocks push to master"
+exit_code=0
+echo "refs/heads/master $FEAT_SHA refs/heads/master $BASE_SHA" | bash "$HOOK" 2>/dev/null || exit_code=$?
+assert_exit "$exit_code" "1" "push to master blocked when hooks.protect-main=true"
+
+# Test 5: Normal push to feature branch (no protection on feature branches)
+echo "Test 5: Allow normal push to feature branch"
 exit_code=0
 echo "refs/heads/feature $FEAT_SHA refs/heads/feature $BASE_SHA" | bash "$HOOK" 2>/dev/null || exit_code=$?
 assert_exit "$exit_code" "0" "normal push to feature branch allowed"
 
-# Test 5: Block force push — remote FEAT_SHA is NOT ancestor of new commit
-echo "Test 5: Block force push"
-# Reset feature to trunk, make a different commit → diverges from FEAT_SHA
+# Test 6: Block force push — remote FEAT_SHA is NOT ancestor of new commit
+echo "Test 6: Block force push"
 git checkout trunk --quiet
 git checkout -b forced --quiet
 echo forced > a && git add a && git commit -m "forced" --quiet
 FORCED_SHA=$(git rev-parse forced)
-# remote has FEAT_SHA (the original feature tip)
-# user pushes FORCED_SHA (divergent, FEAT_SHA not an ancestor)
 exit_code=0
 echo "refs/heads/feature $FORCED_SHA refs/heads/feature $FEAT_SHA" | bash "$HOOK" 2>/dev/null || exit_code=$?
-assert_exit "$exit_code" "1" "force push to non-main branch blocked"
+assert_exit "$exit_code" "1" "force push blocked"
 
 rm -rf "$tmpdir"
 

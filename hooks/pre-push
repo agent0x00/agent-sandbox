@@ -1,15 +1,22 @@
 #!/bin/bash
-# Global pre-push hook: block pushes to main and force pushes.
+# Global pre-push hook: block force pushes and optionally protect main.
+# Main protection is opt-in per repo:
+#   git config hooks.protect-main true
 
 ZERO="0000000000000000000000000000000000000000"
 
+# Check if main protection is enabled per-repo (default: off)
+PROTECT_MAIN=$(git config --get hooks.protect-main 2>/dev/null || echo "false")
+
 while read local_ref local_sha remote_ref remote_sha; do
 
-    # Block any push to main or master, except initial setup (remote doesn't exist yet)
+    # Block any push to main or master, except initial setup.
+    # Only active when hooks.protect-main is set to true in repo git config.
     case "$remote_ref" in
         refs/heads/main|refs/heads/master)
-            if [ "$remote_sha" != "$ZERO" ]; then
-                echo "ERROR: Pushing to $remote_ref is blocked. Use a pull request." >&2
+            if [ "$PROTECT_MAIN" = "true" ] && [ "$remote_sha" != "$ZERO" ]; then
+                echo "ERROR: Pushing to $remote_ref is blocked by pre-push hook." >&2
+                echo "       To allow, unset: git config --unset hooks.protect-main" >&2
                 exit 1
             fi
             ;;
