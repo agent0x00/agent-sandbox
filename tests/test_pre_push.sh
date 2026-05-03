@@ -18,20 +18,24 @@ assert_exit() {
 
 echo "=== Pre-push hook tests ==="
 
-# Test 1: Block push to main (stdin-based, no repo needed)
-echo "Test 1: Block push to main"
+# Test 1: Block push to existing main branch
+echo "Test 1: Block push to existing main"
 exit_code=0
 echo "refs/heads/main deadbeef1234 refs/heads/main cafebabe5678" | bash "$HOOK" 2>/dev/null || exit_code=$?
-assert_exit "$exit_code" "1" "push to main is blocked"
+assert_exit "$exit_code" "1" "push to existing main is blocked"
 
-# Test 2: Block push to master
-echo "Test 2: Block push to master"
+# Test 2: Block push to existing master
+echo "Test 2: Block push to existing master"
 exit_code=0
 echo "refs/heads/master deadbeef1234 refs/heads/master cafebabe5678" | bash "$HOOK" 2>/dev/null || exit_code=$?
-assert_exit "$exit_code" "1" "push to master is blocked"
+assert_exit "$exit_code" "1" "push to existing master is blocked"
 
-# Tests 3-4: Use a real git repo
-echo "Tests 3-4: Force push detection (real repo)"
+# Test: Allow initial push to main (remote doesn't exist yet — remote_sha is all zeros)
+echo "Test 3: Allow initial push to main"
+exit_code=0
+echo "refs/heads/main 0000000000000000000000000000000000000000 refs/heads/main 0000000000000000000000000000000000000000" | bash "$HOOK" 2>/dev/null || exit_code=$?
+assert_exit "$exit_code" "0" "initial push to main allowed (remote_sha is zero)"
+echo "Tests 4-5: Force push detection (real repo)"
 tmpdir=$(mktemp -d)
 cd "$tmpdir"
 git init --quiet --initial-branch=trunk
@@ -45,14 +49,14 @@ git checkout -b feature --quiet
 echo feat > a && git add a && git commit -m "feature" --quiet
 FEAT_SHA=$(git rev-parse feature)
 
-# Test 3: Normal push to feature branch (BASE is ancestor of FEAT)
-echo "Test 3: Allow normal push to feature branch"
+# Test 4: Normal push to feature branch (BASE is ancestor of FEAT)
+echo "Test 4: Allow normal push to feature branch"
 exit_code=0
 echo "refs/heads/feature $FEAT_SHA refs/heads/feature $BASE_SHA" | bash "$HOOK" 2>/dev/null || exit_code=$?
 assert_exit "$exit_code" "0" "normal push to feature branch allowed"
 
-# Test 4: Block force push — remote FEAT_SHA is NOT ancestor of new commit
-echo "Test 4: Block force push"
+# Test 5: Block force push — remote FEAT_SHA is NOT ancestor of new commit
+echo "Test 5: Block force push"
 # Reset feature to trunk, make a different commit → diverges from FEAT_SHA
 git checkout trunk --quiet
 git checkout -b forced --quiet

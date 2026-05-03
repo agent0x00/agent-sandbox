@@ -36,7 +36,7 @@ Since HOME is entirely blocked by Landlock, `claude-sandboxed` sets up symlinks 
 ### 2. Remote containment (pre-push hooks + PAT scoping)
 
 **Pre-push hook** (global via `core.hooksPath`):
-- Blocks all pushes to `main`/`master`
+- Blocks pushes to existing `main`/`master` branches (initial setup push is allowed)
 - Blocks force pushes to any branch
 
 **GitHub PAT scoping**:
