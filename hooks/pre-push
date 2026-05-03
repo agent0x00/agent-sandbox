@@ -5,11 +5,13 @@ ZERO="0000000000000000000000000000000000000000"
 
 while read local_ref local_sha remote_ref remote_sha; do
 
-    # Block any push to main or master
+    # Block any push to main or master, except initial setup (remote doesn't exist yet)
     case "$remote_ref" in
         refs/heads/main|refs/heads/master)
-            echo "ERROR: Pushing to $remote_ref is blocked. Use a pull request." >&2
-            exit 1
+            if [ "$remote_sha" != "$ZERO" ]; then
+                echo "ERROR: Pushing to $remote_ref is blocked. Use a pull request." >&2
+                exit 1
+            fi
             ;;
     esac
 
