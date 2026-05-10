@@ -112,7 +112,9 @@ static char *find_project_root(void) {
         if (!slash || slash == dir) break;
         *slash = '\0';
     }
-    return NULL;
+    /* No marker found — use CWD as the project root so the sandbox
+     * works even outside a git repo (e.g. /tmp, ad-hoc directories). */
+    return strdup(cwd);
 }
 
 static char *expand_home(const char *path) {
@@ -146,7 +148,7 @@ static void pl_free(PathList *pl) {
 static void build_ruleset(PathList *writes, PathList *reads, char **extra_writes, int extra_write_count) {
     char *project_root = find_project_root();
     if (!project_root) {
-        fprintf(stderr, "landlock-wrap: no project marker (.git or .sandbox-root) found\n");
+        fprintf(stderr, "landlock-wrap: cannot determine working directory\n");
         exit(1);
     }
 
